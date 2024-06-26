@@ -1,52 +1,55 @@
-class Player:
+import requests
+from bs4 import BeautifulSoup
 
-    def __init__(self, name, team):
-        self.name = name
-        self.xp = 1500
-        self.team = team
-
-    def introduce(self):
-        print(f"Hello! I'm {self.name},  play for {self.team}")
+all_jobs = []
 
 
-class Team:
-    def __init__(self, team_name):
-        self.team_name = team_name
-        self.players = []
+def scrape_page(url):
+    response = requests.get(url)
+    print(f"scrapping page {url} ...")
+    soup = BeautifulSoup(response.content, "html.parser")
 
-    def add_player(self, player_name):
-        new_player = Player(player_name, self.team_name)
-        self.players.append(new_player)
+    jobs = soup.find("section", class_="jobs").find_all("li")[1:-1]
 
-    def remove_player(self, player_name):
-        for player in self.players:
-            if player.name == player_name:
-                self.players.remove(player)
-                break
+    for job in jobs:
+        title = job.find("span", class_="title").text
+        region = job.find("span", class_="region company")
+        companys = job.find_all("span", class_="company")
 
-    def show_players(self):
-        for player in self.players:
-            player.introduce()
+        if region != None:
+            region = region.text
 
-    def show_total_xp(self):
-        total_xp = 0
-        for player in self.players:
-            total_xp += player.xp
+        if len(companys) == 3:
+            company, position, _ = companys
+        else:
+            company, position = companys
 
-        print(f"total XP : {total_xp}")
+        url = job.find("div", class_="tooltip--flag-logo").next_sibling["href"]
 
-
-t1 = Team("T1")
-geng = Team("GenG")
-
-t1.add_player("Taehoon")
-t1.add_player("Faker")
-
-t1.remove_player("Taehoon")
-
-t1.show_players()
-t1.show_total_xp()
+        job_data = {
+            "title": title,
+            "company": company.text,
+            "position": position.text,
+            "region": region,
+            "url": f"https://weworkremotely.com{url}",
+        }
+        all_jobs.append(job_data)
 
 
+def get_pages(url):
+    response = requests.get(url)
+    soup = BeautifulSoup(response.content, "html.parser")
+    return len(soup.find("div", class_="pagination").find_all("span", class_="page"))
 
 
+total_pages = get_pages("https://weworkremotely.com/remote-full-time-jobs?page=1")
+
+
+for x in range(total_pages):
+    url = f"https://weworkremotely.com/remote-full-time-jobs?page={x + 1}"
+    scrape_page(url)
+
+for job in all_jobs:
+    print(job)
+
+print(len(all_jobs))
